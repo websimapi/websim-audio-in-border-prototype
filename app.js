@@ -36,8 +36,10 @@ encodeBtn.addEventListener('click', async () => {
   try {
     const frameMs = Number(frameMsEl.value) || 50;
     const sampleRate = Number(sampleRateEl.value) || 44100;
-    const pngBlob = await encodeImageWithAudio(loadedImage, audioFile, { frameMs, sampleRate, canvasPreview: preview });
-    downloadLink.href = URL.createObjectURL(pngBlob);
+    // now returns a GIF blob
+    const gifBlob = await encodeImageWithAudio(loadedImage, audioFile, { frameMs, sampleRate, canvasPreview: preview });
+    downloadLink.href = URL.createObjectURL(gifBlob);
+    downloadLink.download = 'audio_border.gif';
     downloadLink.classList.remove('hidden');
   } catch (err) {
     alert('Encoding failed: ' + err.message);
