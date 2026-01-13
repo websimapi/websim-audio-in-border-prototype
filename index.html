@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Audio-in-Border Prototype</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {}
+  }
+  </script>
+</head>
+<body>
+  <main>
+    <section id="encode">
+      <h1>Encode audio into image border</h1>
+      <div class="row">
+        <label class="file">
+          Image (PNG/JPEG)
+          <input id="imgIn" type="file" accept="image/png,image/jpeg">
+        </label>
+        <label class="file">
+          Audio (WAV/MP3/OGG)
+          <input id="audioIn" type="file" accept="audio/*">
+        </label>
+      </div>
+      <div class="row">
+        <label>Per-frame duration ms (for calculation)
+          <input id="frameMs" type="number" value="50" min="1">
+        </label>
+        <label>Sample rate (Hz)
+          <input id="sampleRate" type="number" value="44100" min="8000">
+        </label>
+      </div>
+      <div class="row actions">
+        <button id="encodeBtn">Encode → produce PNG</button>
+        <a id="downloadLink" class="hidden" download="audio_border.png">Download Encoded PNG</a>
+      </div>
+      <canvas id="preview" width="480" height="320" class="hidden"></canvas>
+    </section>
+
+    <hr>
+
+    <section id="decode">
+      <h1>Decode audio from image border</h1>
+      <div class="row">
+        <label class="file">
+          Encoded Image (PNG)
+          <input id="encodedIn" type="file" accept="image/png,image/jpeg">
+        </label>
+      </div>
+      <div class="row actions">
+        <button id="decodeBtn">Decode & Play</button>
+        <audio id="player" controls></audio>
+      </div>
+    </section>
+
+    <footer>
+      Prototype: single-image border encoding. For multi-frame GIFs the same method applies per frame.
+    </footer>
+  </main>
+
+  <script type="module" src="app.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
