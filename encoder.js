@@ -1,3 +1,5 @@
+import createGif from 'https://esm.sh/gif.js.optimized';
+
 export async function encodeImageWithAudio(image, audioFile, opts = {}) {
   // options: frameMs, sampleRate, canvasPreview (optional)
   const { frameMs = 50, sampleRate = 44100, canvasPreview = null } = opts;
@@ -20,7 +22,6 @@ export async function encodeImageWithAudio(image, audioFile, opts = {}) {
   // mix down to mono
   const numChannels = decoded.numberOfChannels;
   const len = decoded.length;
-  const fs = decoded.sampleRate;
   const chData = [];
   for (let c = 0; c < numChannels; c++) chData.push(decoded.getChannelData(c));
   const mono = new Float32Array(len);
@@ -53,15 +54,6 @@ export async function encodeImageWithAudio(image, audioFile, opts = {}) {
   }
 
   // 4) We embed full PCM bytes sequentially into border pixels (R,G,B = three bytes).
-  // First, create a header block in the top-left corner border area (first N pixels) with metadata.
-  // Header structure (32 bytes, stored in first 11 pixels = 33 bytes):
-  // - magic: "AGIF" (4 bytes)
-  // - version: 1 (1 byte)
-  // - sampleRate (4 bytes, uint32)
-  // - channels (1 byte) -> 1
-  // - bytesPerSample (1 byte) -> 2
-  // - pcmLengthBytes (8 bytes, uint64 little-endian)
-  // - reserved (13 bytes) = zeros (to fill to 32)
   const pcmBytes = new Uint8Array(pcm16.buffer);
   const pcmLen = pcmBytes.length;
   const header = new Uint8Array(32);
@@ -72,21 +64,15 @@ export async function encodeImageWithAudio(image, audioFile, opts = {}) {
   dv.setUint32(5, sampleRate, true);
   header[9] = 1;
   header[10] = 2;
-  // pcmLen as 64-bit little-endian
   dv.setBigUint64(11, BigInt(pcmLen), true);
 
-  // helper: write bytes into border pixels starting at index 0
   const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
   const W = canvas.width, H = canvas.height;
   function borderPixelIndices() {
     const coords = [];
-    // top row
     for (let x=0;x<W;x++) coords.push([x,0]);
-    // right column (excluding top)
     for (let y=1;y<H;y++) coords.push([W-1,y]);
-    // bottom row (excluding right)
     if (H>1) for (let x=W-2;x>=0;x--) coords.push([x,H-1]);
-    // left column (excluding bottom & top)
     if (W>1) for (let y=H-2;y>0;y--) coords.push([0,y]);
     return coords;
   }
@@ -94,31 +80,52 @@ export async function encodeImageWithAudio(image, audioFile, opts = {}) {
   const totalBorderPixels = coords.length;
   const capacityBytes = totalBorderPixels * 3;
   if (pcmLen + header.length > capacityBytes) {
-    // If audio too large, we offer to truncate to fit
     console.warn('Audio too large for image border, truncating to fit');
   }
 
-  // build payload: header then pcm bytes truncated to capacity
   const payloadLen = Math.min(capacityBytes, header.length + pcmLen);
   const payload = new Uint8Array(payloadLen);
   payload.set(header.subarray(0, Math.min(header.length,payloadLen)), 0);
   if (payloadLen > header.length) payload.set(pcmBytes.subarray(0, payloadLen - header.length), header.length);
 
-  // write payload to imageData
   for (let i=0;i<Math.min(totalBorderPixels, Math.ceil(payloadLen/3)); i++) {
     const [x,y] = coords[i];
     const px = (y*W + x)*4;
     const b0 = payload[i*3 + 0] || 0;
     const b1 = payload[i*3 + 1] || 0;
     const b2 = payload[i*3 + 2] || 0;
-    imgData.data[px+0] = b0; // R
-    imgData.data[px+1] = b1; // G
-    imgData.data[px+2] = b2; // B
-    // alpha keep original
+    imgData.data[px+0] = b0;
+    imgData.data[px+1] = b1;
+    imgData.data[px+2] = b2;
   }
 
   ctx.putImageData(imgData,0,0);
 
-  // export PNG Blob
-  return await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  // 5) Build GIF (single frame) using gif.js so result is a GIF blob
+  return await new Promise((resolve, reject) => {
+    try {
+      // create GIF instance (gif.js.optimized exposes default factory)
+      const GIF = createGif.default || createGif;
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        workerScript: undefined, // let library decide bundled worker
+        width: W,
+        height: H
+      });
+
+      // add the current canvas as a single frame (frame duration from frameMs)
+      gif.addFrame(canvas, {copy: true, delay: frameMs});
+
+      gif.on('finished', function(blob) {
+        resolve(blob);
+      });
+      gif.on('abort', () => reject(new Error('GIF encoding aborted')));
+      gif.on('error', (e) => reject(e));
+
+      gif.render();
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
